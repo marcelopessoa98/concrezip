@@ -10,6 +10,7 @@ Aplicação web estática para reduzir e compactar pastas de laudos cautelares e
 - Em navegadores sem acesso a pastas, baixa cada PDF separadamente.
 - Usa o mecanismo nativo `ExportAsFixedFormat` do Microsoft Word para preservar paginação, fontes, cabeçalhos, rodapés, imagens, tabelas e objetos flutuantes.
 - Requer Windows com Microsoft Word instalado e o auxiliar local disponível na própria tela da ferramenta.
+- O iniciador do auxiliar é autônomo e pode ser aberto diretamente do pacote ZIP; ele não depende de outro arquivo extraído ao lado.
 - O auxiliar escuta somente em `127.0.0.1`, processa um arquivo por vez em uma pasta temporária e apaga os temporários após cada conversão.
 
 ## Privacidade e arquitetura

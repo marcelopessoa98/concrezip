@@ -34,7 +34,7 @@ const markup = `
     </div>
     <details id="word-helper-instructions" class="word-helper-instructions">
       <summary>Como preparar este computador</summary>
-      <ol><li>Baixe e extraia o pacote.</li><li>Abra <strong>Iniciar Conversor Word.cmd</strong>.</li><li>Mantenha a janela do conversor aberta e clique em <strong>Verificar novamente</strong>.</li></ol>
+      <ol><li>Baixe o pacote.</li><li>Abra <strong>Iniciar Conversor Word.cmd</strong>, mesmo que ele ainda esteja dentro do ZIP.</li><li>Mantenha a janela do conversor aberta e clique em <strong>Verificar novamente</strong>.</li></ol>
       <p>Requer Windows com Microsoft Word instalado. O auxiliar recebe arquivos somente pelo endereço local deste computador.</p>
     </details>
   </section>
