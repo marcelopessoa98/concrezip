@@ -18,6 +18,7 @@ import { formatPercent } from "../utils/formatPercent";
 import { logger } from "../utils/logger";
 import { getElement, setHidden, setText } from "./elements";
 import { renderProgress } from "./progress";
+import { mountWordConverter } from "./wordConverter";
 
 const appMarkup = `
   <header class="topbar">
@@ -26,10 +27,15 @@ const appMarkup = `
       <p class="eyebrow">CONCREFUJI · FERRAMENTAS</p>
       <h1>Compactador de Laudos</h1>
     </div>
+    <nav class="tool-nav" aria-label="Ferramentas">
+      <button class="tool-nav-button active" data-tool-button="compressor" type="button">Compactar laudos</button>
+      <button class="tool-nav-button" data-tool-button="word" type="button">Word para PDF</button>
+    </nav>
     <div class="local-badge"><span></span> 100% local</div>
   </header>
 
   <main class="page-shell">
+    <div id="compressor-tool">
     <section class="hero">
       <div>
         <p class="eyebrow red">COMPACTADOR DE LAUDOS CONCREFUJI</p>
@@ -123,6 +129,8 @@ const appMarkup = `
 
     <details class="log-panel"><summary>Mostrar detalhes técnicos</summary><div id="log-list"></div></details>
     <p class="mobile-note">Para laudos grandes, recomendamos usar um computador com Google Chrome ou Microsoft Edge.</p>
+    </div>
+    <div id="word-tool" hidden></div>
   </main>
   <footer><span>ConcreFuji</span><p>Processamento privado e local · Nenhum arquivo é enviado pela internet</p></footer>
 `;
@@ -417,6 +425,23 @@ function bindEvents(): void {
   getElement("#target-size").addEventListener("change", scheduleEstimate);
 }
 
+function bindToolNavigation(): void {
+  const compressor = getElement<HTMLElement>("#compressor-tool");
+  const word = getElement<HTMLElement>("#word-tool");
+  document.querySelectorAll<HTMLButtonElement>("[data-tool-button]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const showWord = button.dataset.toolButton === "word";
+      compressor.hidden = showWord;
+      word.hidden = !showWord;
+      document.querySelectorAll<HTMLButtonElement>("[data-tool-button]").forEach((item) => {
+        item.classList.toggle("active", item === button);
+      });
+      getElement<HTMLElement>(".topbar h1").textContent = showWord ? "Conversor Word para PDF" : "Compactador de Laudos";
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+}
+
 function configureCompatibilityNotice(): void {
   const messages: string[] = [];
   if (!supportsDirectoryPicker()) messages.push("A seleção moderna de pastas não está disponível; será usado o seletor compatível.");
@@ -437,7 +462,9 @@ function bindLogger(): void {
 
 export function mountApp(container: HTMLElement): void {
   container.innerHTML = appMarkup;
+  mountWordConverter(getElement<HTMLElement>("#word-tool"));
   configureCompatibilityNotice();
   bindEvents();
+  bindToolNavigation();
   bindLogger();
 }

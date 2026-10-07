@@ -2,6 +2,7 @@ interface FileSystemDirectoryHandle {
   readonly kind: "directory";
   readonly name: string;
   values(): AsyncIterableIterator<FileSystemFileHandle | FileSystemDirectoryHandle>;
+  getFileHandle(name: string, options?: { create?: boolean }): Promise<FileSystemFileHandle>;
 }
 
 interface FileSystemFileHandle {
@@ -15,6 +16,8 @@ interface FileSystemWritableFileStream extends WritableStream<Uint8Array> {
   write(data: BufferSource | Blob | string): Promise<void>;
   seek(position: number): Promise<void>;
   truncate(size: number): Promise<void>;
+  close(): Promise<void>;
+  abort(reason?: unknown): Promise<void>;
 }
 
 interface SaveFilePickerOptions {
@@ -26,7 +29,7 @@ interface SaveFilePickerOptions {
 }
 
 interface Window {
-  showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
+  showDirectoryPicker?: (options?: { mode?: "read" | "readwrite" }) => Promise<FileSystemDirectoryHandle>;
   showSaveFilePicker?: (options?: SaveFilePickerOptions) => Promise<FileSystemFileHandle>;
 }
 

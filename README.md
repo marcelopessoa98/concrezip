@@ -1,6 +1,14 @@
-# Compactador de Laudos ConcreFuji
+# Ferramentas de Laudos ConcreFuji
 
-Aplicação web estática para reduzir e compactar pastas de laudos cautelares sem enviar arquivos para servidores. A pasta é lida no navegador, fotografias JPEG podem ser redimensionadas e recomprimidas em Web Workers, e o resultado é escrito em um arquivo ZIP preservando a hierarquia original.
+Aplicação web estática para reduzir e compactar pastas de laudos cautelares e converter vários documentos Word em PDFs separados, sem enviar arquivos para servidores. A pasta é lida no navegador, fotografias JPEG podem ser redimensionadas e recomprimidas em Web Workers, e o resultado é escrito em um arquivo ZIP preservando a hierarquia original.
+
+## Conversão Word para PDF em lote
+
+- Aceita vários arquivos `.docx` por seleção ou arraste.
+- Gera um PDF separado para cada documento, preservando o nome do arquivo.
+- No Chrome e Edge, grava todos os PDFs diretamente na pasta escolhida.
+- Em navegadores sem acesso a pastas, baixa cada PDF separadamente.
+- A conversão ocorre localmente. O formato binário antigo `.doc` precisa ser salvo como `.docx` antes da conversão.
 
 ## Privacidade e arquitetura
 
