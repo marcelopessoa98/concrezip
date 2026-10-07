@@ -177,7 +177,7 @@
 .word-result-card { padding: 48px; text-align: center; }
 .word-result-card h2 { margin: 8px 0 5px; font: 800 30px Manrope, sans-serif; }
 .word-result-card > p:not(.eyebrow) { margin: 0 0 25px; color: var(--muted); }
-.word-render-host { position: fixed; top: 0; left: -100000px; z-index: -1; width: 210mm; min-height: 297mm; overflow: visible; background: white; color: black; }
+.word-render-host { position: fixed; top: 0; left: 0; z-index: -2147483647; width: 210mm; min-height: 297mm; overflow: visible; pointer-events: none; background: white; color: black; }
 .word-render-host > section { margin: 0 !important; box-shadow: none !important; background: white !important; }
 
 @media (max-width: 760px) {
