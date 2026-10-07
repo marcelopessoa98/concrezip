@@ -4,15 +4,17 @@ Aplicação web estática para reduzir e compactar pastas de laudos cautelares e
 
 ## Conversão Word para PDF em lote
 
-- Aceita vários arquivos `.docx` por seleção ou arraste.
+- Aceita vários arquivos `.docx`, `.doc`, `.docm` e `.rtf` por seleção ou arraste.
 - Gera um PDF separado para cada documento, preservando o nome do arquivo.
 - No Chrome e Edge, grava todos os PDFs diretamente na pasta escolhida.
 - Em navegadores sem acesso a pastas, baixa cada PDF separadamente.
-- A conversão ocorre localmente. O formato binário antigo `.doc` precisa ser salvo como `.docx` antes da conversão.
+- Usa o mecanismo nativo `ExportAsFixedFormat` do Microsoft Word para preservar paginação, fontes, cabeçalhos, rodapés, imagens, tabelas e objetos flutuantes.
+- Requer Windows com Microsoft Word instalado e o auxiliar local disponível na própria tela da ferramenta.
+- O auxiliar escuta somente em `127.0.0.1`, processa um arquivo por vez em uma pasta temporária e apaga os temporários após cada conversão.
 
 ## Privacidade e arquitetura
 
-- Todo o processamento ocorre localmente no navegador.
+- Todo o processamento ocorre localmente. A compactação acontece no navegador; a conversão Word usa o Microsoft Word instalado por meio do auxiliar local.
 - Não há backend, API de upload, analytics ou telemetria.
 - Os arquivos originais são somente lidos; nunca são sobrescritos, movidos ou excluídos.
 - No Chrome e Edge, o ZIP é gravado progressivamente no destino escolhido pela File System Access API. Assim, o arquivo final não precisa ficar inteiro na memória.

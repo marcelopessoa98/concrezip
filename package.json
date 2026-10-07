@@ -10,15 +10,10 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@zip.js/zip.js": "^2.7.57",
-    "docx-preview": "^0.4.1",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^4.2.1"
+    "@zip.js/zip.js": "^2.7.57"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "@types/jpeg-js": "^0.3.0",
-    "jpeg-js": "^0.4.4",
     "pdf-lib": "^1.17.1",
     "typescript": "^5.7.3",
     "vite": "^6.1.0"

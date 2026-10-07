@@ -1,7 +1,8 @@
+import { checkWordBridge, convertWithMicrosoftWord } from "../services/wordNativeService";
 import { formatBytes } from "../utils/formatBytes";
 import { getElement, setHidden, setText } from "./elements";
 
-type ConversionStatus = "pending" | "converting" | "complete" | "error" | "unsupported";
+type ConversionStatus = "pending" | "converting" | "complete" | "error";
 
 interface ConversionItem {
   id: number;
@@ -15,14 +16,27 @@ interface ConversionItem {
 const markup = `
   <section class="word-hero">
     <div>
-      <p class="eyebrow red">CONVERSOR EM LOTE CONCREFUJI</p>
-      <h2>Vários arquivos Word.<br><em>Um PDF para cada.</em></h2>
-      <p>Converta todos os documentos selecionados de uma só vez, sem unir os resultados.</p>
+      <p class="eyebrow red">CONVERSOR NATIVO CONCREFUJI</p>
+      <h2>Conversão pelo Word.<br><em>Formatação preservada.</em></h2>
+      <p>Gere vários PDFs separados usando o próprio Microsoft Word, sem recriar ou reinterpretar os documentos.</p>
     </div>
     <div class="privacy-card">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 5.2v5.7c0 5 3.2 9.4 7.5 11.1 4.3-1.7 7.5-6.1 7.5-11.1V5.2L12 2Zm0 3 4.5 1.9v4c0 3.4-1.9 6.6-4.5 8-2.6-1.4-4.5-4.6-4.5-8v-4L12 5Z"/></svg>
-      <div><strong>Conversão privada e local</strong><p>Os documentos não são enviados para servidores e os arquivos originais permanecem intactos.</p></div>
+      <div><strong>Conversão privada e local</strong><p>Os documentos ficam no computador e são convertidos pelo Microsoft Word instalado.</p></div>
     </div>
+  </section>
+
+  <section id="word-bridge-card" class="card word-bridge-card is-checking">
+    <div class="word-bridge-status"><span id="word-bridge-dot"></span><div><strong id="word-bridge-title">Verificando conversor local…</strong><p id="word-bridge-detail">Aguarde enquanto procuramos o Microsoft Word.</p></div></div>
+    <div class="word-bridge-actions">
+      <a id="download-word-helper" class="button ghost" href="/concrezip-conversor-word.zip" download>Baixar conversor local</a>
+      <button id="check-word-bridge" class="button primary" type="button">Verificar novamente</button>
+    </div>
+    <details id="word-helper-instructions" class="word-helper-instructions">
+      <summary>Como preparar este computador</summary>
+      <ol><li>Baixe e extraia o pacote.</li><li>Abra <strong>Iniciar Conversor Word.cmd</strong>.</li><li>Mantenha a janela do conversor aberta e clique em <strong>Verificar novamente</strong>.</li></ol>
+      <p>Requer Windows com Microsoft Word instalado. O auxiliar recebe arquivos somente pelo endereço local deste computador.</p>
+    </details>
   </section>
 
   <div id="word-error" class="notice error" hidden><strong>Não foi possível continuar.</strong><span id="word-error-text"></span></div>
@@ -32,8 +46,8 @@ const markup = `
       <div class="word-icon" aria-hidden="true"><span>W</span></div>
       <div><h3>Selecione os arquivos Word</h3><p>Arraste vários arquivos para cá ou escolha no computador</p></div>
       <button id="select-word-files" class="button primary" type="button">Selecionar arquivos</button>
-      <input id="word-file-input" type="file" accept=".docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword" multiple hidden>
-      <small>Compatível com .docx. Arquivos .doc antigos precisam ser salvos como .docx antes da conversão.</small>
+      <input id="word-file-input" type="file" accept=".docx,.doc,.docm,.rtf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword" multiple hidden>
+      <small>Compatível com .docx, .doc, .docm e .rtf. Os arquivos originais não são modificados.</small>
     </div>
   </section>
 
@@ -45,8 +59,6 @@ const markup = `
       </div>
       <div id="word-file-list" class="word-file-list"></div>
     </article>
-
-    <p id="word-legacy-warning" class="notice warning" hidden></p>
     <div class="word-action-row">
       <div><strong id="word-ready-title">Pronto para converter</strong><p id="word-save-caption"></p></div>
       <button id="start-word-conversion" class="button primary large" type="button">Escolher pasta e converter</button>
@@ -55,7 +67,7 @@ const markup = `
 
   <section id="word-result" class="card word-result-card" hidden>
     <div class="success-icon">✓</div>
-    <p class="eyebrow red">CONVERSÃO EM LOTE CONCLUÍDA</p>
+    <p class="eyebrow red">CONVERSÃO NATIVA CONCLUÍDA</p>
     <h2 id="word-result-title"></h2>
     <p id="word-result-caption"></p>
     <button id="new-word-conversion" class="button primary" type="button">Nova conversão</button>
@@ -65,6 +77,7 @@ const markup = `
 let items: ConversionItem[] = [];
 let nextId = 1;
 let processing = false;
+let bridgeReady = false;
 let controller: AbortController | undefined;
 
 function extensionOf(name: string): string {
@@ -90,7 +103,8 @@ function uniqueOutputName(preferred: string, used: Set<string>): string {
 
 function addFiles(files: FileList | File[]): void {
   if (processing) return;
-  const incoming = Array.from(files).filter((file) => [".docx", ".doc"].includes(extensionOf(file.name)));
+  const allowed = new Set([".docx", ".doc", ".docm", ".rtf"]);
+  const incoming = Array.from(files).filter((file) => allowed.has(extensionOf(file.name)));
   const known = new Set(items.map((item) => `${item.file.name}|${item.file.size}|${item.file.lastModified}`));
   const usedNames = new Set(items.map((item) => item.outputName.toLocaleLowerCase("pt-BR")));
 
@@ -98,23 +112,15 @@ function addFiles(files: FileList | File[]): void {
     const signature = `${file.name}|${file.size}|${file.lastModified}`;
     if (known.has(signature)) continue;
     known.add(signature);
-    const legacy = extensionOf(file.name) === ".doc";
-    items.push({
-      id: nextId++,
-      file,
-      outputName: uniqueOutputName(pdfNameFor(file.name), usedNames),
-      status: legacy ? "unsupported" : "pending",
-      error: legacy ? "Formato .doc antigo — salve como .docx no Word." : undefined,
-    });
+    items.push({ id: nextId++, file, outputName: uniqueOutputName(pdfNameFor(file.name), usedNames), status: "pending" });
   }
   renderQueue();
 }
 
 function statusLabel(item: ConversionItem): string {
   if (item.status === "pending") return "Aguardando";
-  if (item.status === "converting") return "Convertendo…";
+  if (item.status === "converting") return "Convertendo pelo Word…";
   if (item.status === "complete") return `Concluído · ${formatBytes(item.outputBytes ?? 0)}`;
-  if (item.status === "unsupported") return "Formato não compatível";
   return "Falha na conversão";
 }
 
@@ -123,7 +129,6 @@ function renderQueue(): void {
   list.replaceChildren(...items.map((item) => {
     const row = document.createElement("div");
     row.className = `word-file-row status-${item.status}`;
-    row.dataset.id = String(item.id);
     const details = document.createElement("div");
     details.className = "word-file-details";
     const name = document.createElement("strong");
@@ -148,23 +153,42 @@ function renderQueue(): void {
     return row;
   }));
 
-  const convertible = items.filter((item) => item.status !== "unsupported");
-  const legacyCount = items.length - convertible.length;
   setText("#word-file-count", `${items.length.toLocaleString("pt-BR")} ${items.length === 1 ? "arquivo" : "arquivos"}`);
   setHidden("#word-workspace", items.length === 0);
   setHidden(".word-selection-card", items.length > 0);
-  setText("#word-save-caption", window.showDirectoryPicker
-    ? "Cada PDF será salvo separadamente na pasta que você escolher."
-    : "Cada PDF será baixado separadamente pelo navegador.");
-  setHidden("#word-legacy-warning", legacyCount === 0);
-  if (legacyCount > 0) {
-    setText("#word-legacy-warning", `${legacyCount} arquivo(s) .doc antigo(s) não serão convertido(s). Abra-os no Word e use “Salvar como” para gerar arquivos .docx.`);
-  }
+  setText("#word-save-caption", bridgeReady
+    ? window.showDirectoryPicker ? "Cada PDF será salvo separadamente na pasta escolhida." : "Cada PDF será baixado separadamente."
+    : "Abra o conversor local para habilitar a conversão fiel pelo Microsoft Word.");
   const startButton = getElement<HTMLButtonElement>("#start-word-conversion");
-  startButton.disabled = processing || convertible.length === 0;
+  startButton.disabled = processing || items.length === 0 || !bridgeReady;
   if (!processing) startButton.textContent = window.showDirectoryPicker ? "Escolher pasta e converter" : "Converter e baixar PDFs";
   getElement<HTMLButtonElement>("#add-word-files").disabled = processing;
   getElement<HTMLButtonElement>("#clear-word-files").disabled = processing;
+}
+
+async function refreshBridgeStatus(): Promise<void> {
+  const card = getElement<HTMLElement>("#word-bridge-card");
+  const button = getElement<HTMLButtonElement>("#check-word-bridge");
+  card.className = "card word-bridge-card is-checking";
+  button.disabled = true;
+  setText("#word-bridge-title", "Verificando conversor local…");
+  setText("#word-bridge-detail", "Procurando o Microsoft Word neste computador.");
+  try {
+    const info = await checkWordBridge(AbortSignal.timeout(4_000));
+    bridgeReady = info.ready;
+    card.className = "card word-bridge-card is-ready";
+    setText("#word-bridge-title", "Conversor local conectado");
+    setText("#word-bridge-detail", `${info.engine} ${info.version} pronto para preservar a formatação original.`);
+    getElement<HTMLDetailsElement>("#word-helper-instructions").open = false;
+  } catch {
+    bridgeReady = false;
+    card.className = "card word-bridge-card is-offline";
+    setText("#word-bridge-title", "Conversor local não encontrado");
+    setText("#word-bridge-detail", "Baixe ou abra o auxiliar para converter com o mecanismo original do Microsoft Word.");
+  } finally {
+    button.disabled = false;
+    renderQueue();
+  }
 }
 
 async function saveBlob(blob: Blob, name: string, directory?: FileSystemDirectoryHandle): Promise<void> {
@@ -188,45 +212,42 @@ async function saveBlob(blob: Blob, name: string, directory?: FileSystemDirector
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+async function chooseDestination(): Promise<FileSystemDirectoryHandle | undefined> {
+  const directory = await window.showDirectoryPicker?.({ mode: "readwrite" });
+  if (!directory) return undefined;
+  const usedNames = new Set<string>();
+  for await (const entry of directory.values()) {
+    if (entry.kind === "file") usedNames.add(entry.name.toLocaleLowerCase("pt-BR"));
+  }
+  for (const item of items) item.outputName = uniqueOutputName(pdfNameFor(item.file.name), usedNames);
+  return directory;
+}
+
 async function startConversion(): Promise<void> {
-  if (processing) return;
-  const convertible = items.filter((item) => item.status !== "unsupported");
-  if (convertible.length === 0) return;
+  if (processing || items.length === 0) return;
   setHidden("#word-error", true);
+  if (!bridgeReady) {
+    showWordError(new Error("Abra o Conversor Word local e clique em “Verificar novamente”."));
+    return;
+  }
 
   let directory: FileSystemDirectoryHandle | undefined;
   try {
-    directory = await window.showDirectoryPicker?.({ mode: "readwrite" });
+    directory = await chooseDestination();
   } catch (error) {
     if (error instanceof DOMException && error.name === "AbortError") return;
     showWordError(error);
     return;
   }
 
-  try {
-    if (directory) {
-      const usedNames = new Set<string>();
-      for await (const entry of directory.values()) {
-        if (entry.kind === "file") usedNames.add(entry.name.toLocaleLowerCase("pt-BR"));
-      }
-      for (const item of convertible) {
-        item.outputName = uniqueOutputName(pdfNameFor(item.file.name), usedNames);
-      }
-    }
-  } catch (error) {
-    showWordError(error);
-    return;
-  }
-
   processing = true;
   controller = new AbortController();
-  for (const item of convertible) {
+  for (const item of items) {
     item.status = "pending";
     item.error = undefined;
     item.outputBytes = undefined;
   }
   renderQueue();
-  setText("#word-ready-title", "Conversão em andamento");
   const button = getElement<HTMLButtonElement>("#start-word-conversion");
   button.disabled = false;
   button.textContent = "Cancelar conversão";
@@ -236,14 +257,13 @@ async function startConversion(): Promise<void> {
   let completed = 0;
   let failed = 0;
   try {
-    const { convertDocxToPdf } = await import("../services/wordToPdfService");
-    for (const item of convertible) {
+    for (const item of items) {
       if (controller.signal.aborted) throw new DOMException("Conversão cancelada.", "AbortError");
       item.status = "converting";
+      setText("#word-ready-title", `Convertendo ${completed + failed + 1} de ${items.length} pelo Microsoft Word`);
       renderQueue();
-      setText("#word-ready-title", `Convertendo ${completed + failed + 1} de ${convertible.length}`);
       try {
-        const pdf = await convertDocxToPdf(item.file, controller.signal);
+        const pdf = await convertWithMicrosoftWord(item.file, controller.signal);
         await saveBlob(pdf, item.outputName, directory);
         item.status = "complete";
         item.outputBytes = pdf.size;
@@ -259,16 +279,15 @@ async function startConversion(): Promise<void> {
 
     setHidden("#word-workspace", true);
     setHidden("#word-result", false);
-    setText("#word-result-title", `${completed.toLocaleString("pt-BR")} PDF(s) criado(s)`);
+    setText("#word-result-title", `${completed.toLocaleString("pt-BR")} PDF(s) criado(s) pelo Word`);
     setText("#word-result-caption", failed > 0
-      ? `${failed.toLocaleString("pt-BR")} arquivo(s) apresentaram erro. Os demais foram salvos separadamente.`
-      : "Todos os documentos foram convertidos e salvos como arquivos PDF separados.");
+      ? `${failed.toLocaleString("pt-BR")} arquivo(s) apresentaram erro. Os demais foram exportados com a formatação original.`
+      : "Todos os documentos foram exportados separadamente pelo mecanismo nativo do Microsoft Word.");
   } catch (error) {
     if (!(error instanceof DOMException && error.name === "AbortError")) showWordError(error);
   } finally {
     processing = false;
     controller = undefined;
-    button.textContent = window.showDirectoryPicker ? "Escolher pasta e converter" : "Converter e baixar PDFs";
     button.classList.add("primary");
     button.classList.remove("danger");
     setText("#word-ready-title", "Pronto para converter");
@@ -299,6 +318,7 @@ export function mountWordConverter(container: HTMLElement): void {
   getElement("#add-word-files").addEventListener("click", openPicker);
   getElement("#clear-word-files").addEventListener("click", reset);
   getElement("#new-word-conversion").addEventListener("click", reset);
+  getElement("#check-word-bridge").addEventListener("click", () => void refreshBridgeStatus());
   getElement("#start-word-conversion").addEventListener("click", () => {
     if (processing) controller?.abort();
     else void startConversion();
@@ -329,4 +349,5 @@ export function mountWordConverter(container: HTMLElement): void {
     if (event.key === "Enter" || event.key === " ") openPicker();
   });
   renderQueue();
+  void refreshBridgeStatus();
 }
